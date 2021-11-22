@@ -6,76 +6,96 @@ namespace MazeTest
         private Graphics _gfx;
         private Bitmap _overImg;
         private Bitmap _mazeImg;
-        private Pen _pathPen = new Pen(Brushes.DodgerBlue, 4);
-        private Pen _pathPenComp = new Pen(Brushes.Red, 5);
+        private Pen _pathPen = new Pen(Brushes.BlueViolet, 4);
+        private Pen _pathPenComp = new Pen(Brushes.Red, 6);
 
-        private Cell _start;
-        private Cell _finish;
-        private Cell[] _cells;
-        private bool _startSet = false;
-        private bool _finishSet = false;
+        private Pen _startCellPen = new Pen(Brushes.GreenYellow, 10);
+        private Pen _finishCellPen = new Pen(Brushes.Blue, 10);
 
-        private const int _columns = 80;//60;//40;
-        private const int _rows = 80; //60;//40;
+        private CellCollection _cellCollection;
+
+        //private string _mazeFile = null;
+        const int _blackPixelVal = -16777216;
 
         public Form1()
         {
             InitializeComponent();
         }
 
-        private void Test()
+        private void LoadMaze(string path)
         {
-            var mazeFile = $@"{Environment.CurrentDirectory}/maze.png";
-            _mazeImg = new Bitmap(Bitmap.FromFile(mazeFile));
+            if (path == null)
+                return;
+
+            //var mazeFile = $@"{Environment.CurrentDirectory}/maze.png";
+            _mazeImg = new Bitmap(Bitmap.FromFile(path));
             _overImg = (Bitmap)_mazeImg.Clone();
-            var cellPen = new Pen(Color.FromArgb(150, Color.LimeGreen));
             _gfx = Graphics.FromImage(_overImg);
+
+            _gfx.DrawImage(_mazeImg, new Point());
+
+            pictureBox1.Image = _overImg;
+
+            ProcessMazeCells();
+
+            SolveButton.Enabled = true;
+        }
+
+        private void ProcessMazeCells()
+        {
+            var cellPen = new Pen(Color.FromArgb(150, Color.LimeGreen));
             var cellCoordFont = new Font("Tahoma", 6, FontStyle.Regular);
 
             var cells = new List<Cell>();
 
-
             int xOffset = 0;
             int yOffset = 0;
-            int step = 16;
-            int halfStep = step / 2;
+            int stepSize = FindStepSize();
+            int halfStep = stepSize / 2;
             int idxX = 0;
             int idxY = 0;
-            for (int x = xOffset; x < _mazeImg.Width - xOffset - halfStep; x += step)
+
+            InitPens(stepSize);
+
+            var columns = _mazeImg.Width / stepSize;
+            var rows = _mazeImg.Height / stepSize;
+
+            for (int x = xOffset; x < _mazeImg.Width - xOffset - halfStep; x += stepSize)
             {
                 idxY = 0;
-                for (int y = yOffset; y < _mazeImg.Height - yOffset - halfStep; y += step)
+                for (int y = yOffset; y < _mazeImg.Height - yOffset - halfStep; y += stepSize)
                 {
                     var centerX = x + halfStep;
                     var centerY = y + halfStep;
 
-                    _gfx.DrawRectangle(cellPen, new Rectangle(x, y, step, step));
+                    _gfx.DrawRectangle(cellPen, new Rectangle(x, y, stepSize, stepSize));
                     _gfx.FillEllipse(Brushes.Blue, centerX, centerY, 2, 2);
 
                     //string label = $"{idxX},{idxY}";
                     //var lblSize = _gfx.MeasureString(label, cellCoordFont);
                     //_gfx.DrawString(label, cellCoordFont, Brushes.Black, new PointF((float)(centerX - (lblSize.Width / 2f)), (float)(centerY - (lblSize.Height / 2f))));
 
+                    // Get pixel colors at each side.
                     var pTop = _mazeImg.GetPixel(centerX, centerY - halfStep).ToArgb();
                     var pLeft = _mazeImg.GetPixel(centerX - halfStep, centerY).ToArgb();
                     var pBottom = _mazeImg.GetPixel(centerX, centerY + halfStep).ToArgb();
                     var pRight = _mazeImg.GetPixel(centerX + halfStep, centerY).ToArgb();
 
+                    // Set sides where pixels are not pure black.
                     int sides = 0;
-                    int whiteVal = -16777216;
-                    if (pTop > whiteVal)
+                    if (pTop > _blackPixelVal)
                         sides += (int)Side.Top;
 
-                    if (pLeft > whiteVal)
+                    if (pLeft > _blackPixelVal)
                         sides += (int)Side.Left;
 
-                    if (pBottom > whiteVal)
+                    if (pBottom > _blackPixelVal)
                         sides += (int)Side.Bottom;
 
-                    if (pRight > whiteVal)
+                    if (pRight > _blackPixelVal)
                         sides += (int)Side.Right;
 
-                    cells.Add(new Cell(centerX, centerY, idxX, idxY, step, (Side)sides));
+                    cells.Add(new Cell(centerX, centerY, idxX, idxY, stepSize, (Side)sides));
 
                     idxY++;
                 }
@@ -83,23 +103,95 @@ namespace MazeTest
                 idxX++;
             }
 
-            _cells = cells.ToArray();
+            _cellCollection = new CellCollection(cells, columns, rows);
+            _cellCollection.FindStartAndFinish();
 
-            //var cellCollection = new CellCollection(cells, columns, rows);
-            //var path = FindPath(cellCollection, cellCollection[10, 19], cellCollection[9, 0]);
-            //DrawPath(path);
-
-            pictureBox1.Image = _overImg;
+            pictureBox1.Refresh();
         }
 
-        private int _steps = 0;
-        private void DrawPath(List<Cell> path, Pen pen, bool gradiant)
+        private void InitPens(int stepSize)
         {
-            //_steps++;
+            _pathPen = new Pen(Brushes.Blue, stepSize / 2);
+            _pathPenComp = new Pen(Brushes.Red, stepSize);
 
-            //if (_steps % 10 != 0)
-            //    return;
+            _startCellPen = new Pen(Brushes.GreenYellow, stepSize + 2);
+            _finishCellPen = new Pen(Brushes.Blue, stepSize + 2);
 
+        }
+
+        private int FindStepSize()
+        {
+            int steps = 0;
+            bool found = false;
+            bool firstEdge = false;
+            while (!found)
+            {
+                var pixel = _mazeImg.GetPixel(steps, steps).ToArgb();
+
+                if (!firstEdge && pixel > _blackPixelVal)
+                {
+                    firstEdge = true;
+                }
+                else if (firstEdge && pixel <= _blackPixelVal)
+                {
+                    break;
+                }
+
+
+
+                steps++;
+            }
+
+            return steps;
+        }
+
+        private void StressTest(int count)
+        {
+            var timer = new System.Diagnostics.Stopwatch();
+            timer.Restart();
+
+            for (int i = 0; i < count; i++)
+            {
+                _steps = 0;
+
+                _cellCollection.ClearStates();
+
+                timer.Start();
+
+                var path = FindPath(_cellCollection, 0);
+
+                timer.Stop();
+
+            }
+
+            System.Diagnostics.Debug.WriteLine(string.Format("StressTest: {0} ms  {1} ticks", timer.Elapsed.TotalMilliseconds, timer.Elapsed.Ticks));
+
+        }
+
+        private void Solve()
+        {
+            _gfx.DrawImage(_mazeImg, new Point());
+            pictureBox1.Refresh();
+
+            var timer = new System.Diagnostics.Stopwatch();
+            timer.Restart();
+
+            _steps = 0;
+            var path = FindPath(_cellCollection, 10);
+
+            timer.Stop();
+            System.Diagnostics.Debug.WriteLine(string.Format("Solution Time: {0} ms  {1} ticks", timer.Elapsed.TotalMilliseconds, timer.Elapsed.Ticks));
+
+            DrawVisitedCells(_cellCollection.Cells);
+            DrawPath(path, _pathPenComp, false, true);
+
+            pictureBox1.Refresh();
+        }
+
+
+        private int _steps = 0;
+        private void DrawPath(List<Cell> path, Pen pen, bool gradiant, bool force)
+        {
 
             //_gfx.Clear(Color.White);
             //_gfx.DrawImage(_mazeImg, new Point());
@@ -108,33 +200,73 @@ namespace MazeTest
             {
                 var a = path[i];
                 var b = path[i + 1];
-                if (gradiant)
-                    pen.Color = GetVariableColor(Color.Blue, Color.Red, Color.Yellow, path.Count, i, 240, true);
 
-                _gfx.DrawLine(pen, a.X, a.Y, b.X, b.Y);
 
-                if (i == path.Count - 2)
+                //if (gradiant)
+                //    pen.Color = GetVariableColor(Color.Blue, Color.Red, Color.Orange, path.Count, i, 200, true);
+
+                //pen.Color = GetVariableColor(Color.Blue, Color.Red, Color.Orange, path.Count, i, 255, false);
+
+                if ((!a.WasDrawn || !b.WasDrawn) || force == true)
                 {
-                    var poly = path[i].GetPoly();
+                    //if (gradiant)
+                    //{
+                    //    var nDrawn = path.Count(p => p.WasDrawn);
+                    //    pen.Color = GetVariableColor(Color.Blue, Color.Red, Color.Orange, _cells.Count(), nDrawn, 200, true);
 
-                    _gfx.DrawPolygon(Pens.Blue, poly);
+                    //    //pen.Color = GetVariableColor(Color.Blue, Color.Red, Color.Orange, path.Count, i, 200, true);
+
+                    //}
+
+                    _gfx.DrawLine(pen, a.X, a.Y, b.X, b.Y);
+
+                    a.WasDrawn = true;
+                    b.WasDrawn = true;
+
+                }
+
+
+                //_gfx.DrawLine(pen, a.X, a.Y, b.X, b.Y);
+
+            }
+
+
+            _gfx.DrawPolygon(_startCellPen, _cellCollection.StartCell.GetPoly());
+            _gfx.DrawPolygon(_finishCellPen, _cellCollection.FinishCell.GetPoly());
+
+            _steps++;
+            if (!(_steps % 100 != 0) || force)
+            {
+                pictureBox1.Refresh();
+                Application.DoEvents();
+            }
+        }
+
+        private void DrawVisitedCells(Cell[] cells)
+        {
+            using (var brush = new SolidBrush(Color.FromArgb(150, Color.RosyBrown)))
+            {
+
+                foreach (var cell in cells)
+                {
+                    if (cell.HasPath)
+                        _gfx.FillPolygon(brush, cell.GetPoly());
                 }
             }
 
-            pictureBox1.Image = _overImg;
-            pictureBox1.Refresh();
-            //Application.DoEvents();
         }
 
-        private List<Cell> FindPath(CellCollection cells, Cell start, Cell finish)
+        private List<Cell> FindPath(CellCollection cells, int drawDelay = 1)
         {
-            foreach (var cell in cells.Cells)
-                cell.HasPath = false;
+            cells.ClearStates();
 
-            int delay = 1;
+            Cell start = cells.StartCell;
+            Cell finish = cells.FinishCell;
+
+            int delay = drawDelay;
             var path = new List<Cell>() { start };
-            int deadEnds = 0;
-            int steps = 0;
+            //int deadEnds = 0;
+            //int steps = 0;
             var openSides = start.GetOpenSides();
             start.HasPath = true;
 
@@ -144,7 +276,7 @@ namespace MazeTest
             bool done = false;
             while (done == false)
             {
-                steps++;
+                //steps++;
                 next = cells.NextCell(next, next.GetOpenSides());
 
                 if (next != null)
@@ -154,17 +286,19 @@ namespace MazeTest
                 }
                 else
                 {
-                    deadEnds++;
+                    //deadEnds++;
                     while (next == null)
                     {
-                        steps++;
+                        //steps++;
                         path.RemoveAt(path.Count - 1);
-                        next = path.Last();
+                        next = path[path.Count - 1];
+
+                        //next = path.Last();
                         next = cells.NextCell(next, next.GetOpenSides());
 
                         //if (delay > 0)
                         //{
-                        //    DrawPath(path);
+                        //DrawPath(path, _pathPen, true);
                         //    Task.Delay(delay).Wait();
                         //}
                     }
@@ -180,12 +314,13 @@ namespace MazeTest
 
                 if (delay > 0)
                 {
-                    DrawPath(path, _pathPen, true);
-                    Task.Delay(delay).Wait();
+                    DrawPath(path, _pathPen, true, false);
+                    //Task.Delay(delay).Wait();
                 }
 
             }
-            Debug.WriteLine($"DeadEnds: {deadEnds}  Steps: {steps}");
+
+            //Debug.WriteLine($"DeadEnds: {deadEnds}  Steps: {steps}");
             return path;
         }
 
@@ -238,6 +373,7 @@ namespace MazeTest
 
             return new PointF(wfactor, hfactor);
         }
+
         private Color GetVariableColor(Color startColor, Color midColor, Color endColor, float maxValue, float currentValue, int alpha, bool translucent = false)
         {
             float intensity = 0;
@@ -337,240 +473,71 @@ namespace MazeTest
             return new Point((int)newX, (int)newY);
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void LoadMazeButton_Click(object sender, EventArgs e)
         {
-            Test();
+            var dialog = new OpenFileDialog();
+            var res = dialog.ShowDialog();
+            if (res == DialogResult.OK)
+            {
+                var mazePath = dialog.FileName;
+                LoadMaze(mazePath);
+            }
+        }
+
+        private void SolveButton_Click(object sender, EventArgs e)
+        {
+            Solve();
         }
 
         private void pictureBox1_MouseUp(object sender, MouseEventArgs e)
         {
-            var scaleLoc = TranslateZoomMousePosition(e.Location);
-
-            Debug.WriteLine($"Clicked!  Raw: {e.Location}  P2Client: {pictureBox1.PointToClient(e.Location)}  P2Screen: {pictureBox1.PointToScreen(e.Location)}  Scaled: {scaleLoc}");
-
-            if (_cells == null)
-                return;
-
-            foreach (var cell in _cells)
-            {
-                if (PointIsInsidePolygon(cell.GetPoly(), scaleLoc))
-                {
-                    Debug.WriteLine($"Cell Clicked: {cell}");
+            //if (!_startSet || !_finishSet)
+            //    return;
 
 
-                    if (_startSet == false && _finishSet == false)
-                    {
-                        _start = cell;
-                        _start.Sides -= Side.Bottom;
+            //var scaleLoc = TranslateZoomMousePosition(e.Location);
 
-                        _startSet = true;
-                        Debug.WriteLine($"Start cell: {_start}");
-                    }
-                    else if (_startSet == true && _finishSet == false)
-                    {
-                        _finish = cell;
-                        _finish.Sides -= Side.Top;
+            //Debug.WriteLine($"Clicked!  Raw: {e.Location}  P2Client: {pictureBox1.PointToClient(e.Location)}  P2Screen: {pictureBox1.PointToScreen(e.Location)}  Scaled: {scaleLoc}");
 
-                        _finishSet = true;
-                        Debug.WriteLine($"Finish cell: {_finish}");
+            //if (_cells == null)
+            //    return;
 
-                    }
-                }
-            }
+            //foreach (var cell in _cells)
+            //{
+            //    if (PointIsInsidePolygon(cell.GetPoly(), scaleLoc))
+            //    {
+            //        Debug.WriteLine($"Cell Clicked: {cell}");
+
+
+            //        if (_startSet == false && _finishSet == false)
+            //        {
+            //            _startCell = cell;
+            //            _startCell.Sides -= Side.Bottom;
+
+            //            _startSet = true;
+            //            Debug.WriteLine($"Start cell: {_startCell}");
+            //        }
+            //        else if (_startSet == true && _finishSet == false)
+            //        {
+            //            _finishCell = cell;
+            //            _finishCell.Sides -= Side.Top;
+
+            //            _finishSet = true;
+            //            Debug.WriteLine($"Finish cell: {_finishCell}");
+
+            //        }
+            //    }
+            //}
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private void button1_Click(object sender, EventArgs e)
         {
-            if (!_startSet || !_finishSet)
-                return;
-
-            var cellCollection = new CellCollection(_cells, _columns, _rows);
-
-            var timer = new System.Diagnostics.Stopwatch();
-            timer.Restart();
-
-            _gfx.DrawImage(_mazeImg, new Point());
-            var path = FindPath(cellCollection, _start, _finish);
-
-
-            timer.Stop();
-            System.Diagnostics.Debug.WriteLine(string.Format("Solution Time: {0} ms  {1} ticks", timer.Elapsed.TotalMilliseconds, timer.Elapsed.Ticks));
-
-
-            DrawPath(path, _pathPenComp, false);
+            StressTest(2000);
         }
     }
 
-    public class CellCollection
-    {
-        public Cell[] Cells = new Cell[0];
-
-        public int Columns = 0;
-        public int Rows = 0;
-
-
-        public CellCollection(List<Cell> cells, int columns, int rows)
-        {
-            Cells = cells.ToArray();
-            Columns = columns;
-            Rows = rows;
-        }
-
-        public CellCollection(Cell[] cells, int columns, int rows)
-        {
-            Cells = cells.ToArray();
-            Columns = columns;
-            Rows = rows;
-        }
-
-        public Cell this[int x, int y]
-        {
-            get
-            {
-                return Cells[x * Columns + y];
-            }
-        }
-
-        public Cell NextCell(Cell current, Side side)
-        {
-            switch (side)
-            {
-                case Side.Top:
-                    return this[current.IdxX, current.IdxY - 1];
-
-                case Side.Left:
-                    return this[current.IdxX - 1, current.IdxY];
-
-                case Side.Bottom:
-                    return this[current.IdxX, current.IdxY + 1];
-
-                case Side.Right:
-                default:
-                    return this[current.IdxX + 1, current.IdxY];
-            }
-
-        }
-
-        public Cell NextCell(Cell current, Side[] sides)
-        {
-            foreach (var side in sides)
-            {
-                var next = NextCell(current, side);
-                if (next.HasPath == false)
-                    return next;
-            }
-
-            return null;
-        }
-    }
-
-    public class Cell
-    {
-        public int IdxX;
-        public int IdxY;
-
-        public int X;
-        public int Y;
-        public Side Sides;
-        public int SideLen;
-        public bool HasPath = false;
-
-        //public Cell(int x, int y, List<Side> openSides)
-        //{
-        //    X = x;
-        //    Y = y;
-        //    OpenSides = openSides;
-        //}
-
-        public Cell(int x, int y, Side sides)
-        {
-            X = x;
-            Y = y;
-            Sides = sides;
-        }
-
-        public Cell(int x, int y, int idxX, int idxY, int sideLen, Side sides)
-        {
-            X = x;
-            Y = y;
-            IdxX = idxX;
-            IdxY = idxY;
-            Sides = sides;
-            SideLen = sideLen;
-        }
-
-        public Side[] GetOpenSides()
-        {
-            var sides = new List<Side>();
-            for (int i = 1; i <= 8; i <<= 1)
-            {
-                Side side = (Side)i;
-                if ((Sides & side) == side)
-                    sides.Add(side);
-            }
-
-            return sides.ToArray();
-        }
-
-        //public PointF[] GetPoly()
-        //{
-        //    var poly = new PointF[4];
-
-        //    int sideLenHalf = SideLen / 2;
-        //    poly[0] = new PointF(X - sideLenHalf, Y - sideLenHalf); // Top-Left
-        //    poly[1] = new PointF(X + sideLenHalf, Y - sideLenHalf); // Top-Right
-        //    poly[2] = new PointF(X + sideLenHalf, Y + sideLenHalf); // Bot-Right
-        //    poly[3] = new PointF(X - sideLenHalf, Y + sideLenHalf); // Bot-Left
-        //    return poly;
-        //}
-
-        public Point[] GetPoly()
-        {
-            var poly = new Point[4];
-
-            int sideLenHalf = SideLen / 2;
-            poly[0] = new Point(X - sideLenHalf, Y - sideLenHalf); // Top-Left
-            poly[1] = new Point(X + sideLenHalf, Y - sideLenHalf); // Top-Right
-            poly[2] = new Point(X + sideLenHalf, Y + sideLenHalf); // Bot-Right
-            poly[3] = new Point(X - sideLenHalf, Y + sideLenHalf); // Bot-Left
-            return poly;
-        }
 
 
 
-        public PointF[] GetPoly(PointF scale)
-        {
-            var poly = new PointF[4];
 
-            int sideLenHalf = SideLen / 2;
-            poly[0] = new PointF((X - sideLenHalf) * scale.X, (Y - sideLenHalf) * scale.Y); // Top-Left
-            poly[1] = new PointF((X + sideLenHalf) * scale.X, (Y - sideLenHalf) * scale.Y); // Top-Right
-            poly[2] = new PointF((X + sideLenHalf) * scale.X, (Y + sideLenHalf) * scale.Y); // Bot-Right
-            poly[3] = new PointF((X - sideLenHalf) * scale.X, (Y + sideLenHalf) * scale.Y); // Bot-Left
-            return poly;
-        }
-
-        public override string ToString()
-        {
-            string sides = "";
-
-            for (int i = 1; i <= 8; i <<= 1)
-            {
-                Side side = (Side)i;
-                if ((Sides & side) == side)
-                    sides += $" {side.ToString()} |";
-            }
-
-            return $"({X},{Y}) ({IdxX},{IdxY}) [{sides}]";
-        }
-    }
-
-    [Flags]
-    public enum Side
-    {
-        Top = 1,
-        Left = 2,
-        Bottom = 4,
-        Right = 8
-    }
 }

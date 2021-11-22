@@ -28,21 +28,23 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.button1 = new System.Windows.Forms.Button();
+            this.SolveButton = new System.Windows.Forms.Button();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
-            this.button2 = new System.Windows.Forms.Button();
+            this.LoadMazeButton = new System.Windows.Forms.Button();
+            this.button1 = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
             // 
-            // button1
+            // SolveButton
             // 
-            this.button1.Location = new System.Drawing.Point(13, 60);
-            this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(70, 36);
-            this.button1.TabIndex = 0;
-            this.button1.Text = "button1";
-            this.button1.UseVisualStyleBackColor = true;
-            this.button1.Click += new System.EventHandler(this.button1_Click);
+            this.SolveButton.Enabled = false;
+            this.SolveButton.Location = new System.Drawing.Point(27, 70);
+            this.SolveButton.Name = "SolveButton";
+            this.SolveButton.Size = new System.Drawing.Size(75, 36);
+            this.SolveButton.TabIndex = 0;
+            this.SolveButton.Text = "Solve";
+            this.SolveButton.UseVisualStyleBackColor = true;
+            this.SolveButton.Click += new System.EventHandler(this.SolveButton_Click);
             // 
             // pictureBox1
             // 
@@ -58,24 +60,35 @@
             this.pictureBox1.TabStop = false;
             this.pictureBox1.MouseUp += new System.Windows.Forms.MouseEventHandler(this.pictureBox1_MouseUp);
             // 
-            // button2
+            // LoadMazeButton
             // 
-            this.button2.Location = new System.Drawing.Point(12, 12);
-            this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(71, 28);
-            this.button2.TabIndex = 2;
-            this.button2.Text = "button2";
-            this.button2.UseVisualStyleBackColor = true;
-            this.button2.Click += new System.EventHandler(this.button2_Click);
+            this.LoadMazeButton.Location = new System.Drawing.Point(27, 28);
+            this.LoadMazeButton.Name = "LoadMazeButton";
+            this.LoadMazeButton.Size = new System.Drawing.Size(75, 23);
+            this.LoadMazeButton.TabIndex = 3;
+            this.LoadMazeButton.Text = "Load Maze";
+            this.LoadMazeButton.UseVisualStyleBackColor = true;
+            this.LoadMazeButton.Click += new System.EventHandler(this.LoadMazeButton_Click);
+            // 
+            // button1
+            // 
+            this.button1.Location = new System.Drawing.Point(27, 380);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(75, 40);
+            this.button1.TabIndex = 4;
+            this.button1.Text = "button1";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Click += new System.EventHandler(this.button1_Click);
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1060, 860);
-            this.Controls.Add(this.button2);
-            this.Controls.Add(this.pictureBox1);
             this.Controls.Add(this.button1);
+            this.Controls.Add(this.LoadMazeButton);
+            this.Controls.Add(this.pictureBox1);
+            this.Controls.Add(this.SolveButton);
             this.Name = "Form1";
             this.Text = "Form1";
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
@@ -85,8 +98,9 @@
 
         #endregion
 
-        private Button button1;
+        private Button SolveButton;
         private PictureBox pictureBox1;
-        private Button button2;
+        private Button LoadMazeButton;
+        private Button button1;
     }
 }

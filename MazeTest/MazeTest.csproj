@@ -9,9 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="maze.png">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    <Folder Include="Generator\" />
   </ItemGroup>
 
 </Project>
