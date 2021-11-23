@@ -32,6 +32,9 @@
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.LoadMazeButton = new System.Windows.Forms.Button();
             this.button1 = new System.Windows.Forms.Button();
+            this.GenMazeButton = new System.Windows.Forms.Button();
+            this.GenColumnsRowsTextBox = new System.Windows.Forms.TextBox();
+            this.label1 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
             // 
@@ -80,11 +83,41 @@
             this.button1.UseVisualStyleBackColor = true;
             this.button1.Click += new System.EventHandler(this.button1_Click);
             // 
+            // GenMazeButton
+            // 
+            this.GenMazeButton.Location = new System.Drawing.Point(32, 225);
+            this.GenMazeButton.Name = "GenMazeButton";
+            this.GenMazeButton.Size = new System.Drawing.Size(60, 40);
+            this.GenMazeButton.TabIndex = 5;
+            this.GenMazeButton.Text = "Gen";
+            this.GenMazeButton.UseVisualStyleBackColor = true;
+            this.GenMazeButton.Click += new System.EventHandler(this.GenMazeButton_Click);
+            // 
+            // GenColumnsRowsTextBox
+            // 
+            this.GenColumnsRowsTextBox.Location = new System.Drawing.Point(12, 292);
+            this.GenColumnsRowsTextBox.Name = "GenColumnsRowsTextBox";
+            this.GenColumnsRowsTextBox.Size = new System.Drawing.Size(106, 23);
+            this.GenColumnsRowsTextBox.TabIndex = 6;
+            this.GenColumnsRowsTextBox.Text = "200, 200";
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(13, 271);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(92, 15);
+            this.label1.TabIndex = 7;
+            this.label1.Text = "Columns, Rows:";
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1060, 860);
+            this.Controls.Add(this.label1);
+            this.Controls.Add(this.GenColumnsRowsTextBox);
+            this.Controls.Add(this.GenMazeButton);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.LoadMazeButton);
             this.Controls.Add(this.pictureBox1);
@@ -93,6 +126,7 @@
             this.Text = "Form1";
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
@@ -102,5 +136,8 @@
         private PictureBox pictureBox1;
         private Button LoadMazeButton;
         private Button button1;
+        private Button GenMazeButton;
+        private TextBox GenColumnsRowsTextBox;
+        private Label label1;
     }
 }

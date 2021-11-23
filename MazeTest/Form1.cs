@@ -13,13 +13,27 @@ namespace MazeTest
         private Pen _finishCellPen = new Pen(Brushes.Blue, 10);
 
         private CellCollection _cellCollection;
+        private Stack<Cell> _mazeGenStack;
+        private List<Cell> _mazeGenCells;
 
-        //private string _mazeFile = null;
         const int _blackPixelVal = -16777216;
+
+        private Random _random = new Random();
 
         public Form1()
         {
             InitializeComponent();
+        }
+
+
+        private void InitPens(int stepSize)
+        {
+            _pathPen = new Pen(new SolidBrush(Color.FromArgb(150, Color.Blue)), stepSize / 2);
+            _pathPenComp = new Pen(new SolidBrush(Color.FromArgb(150, Color.Red)), stepSize / 2);
+
+            _startCellPen = new Pen(Brushes.GreenYellow, stepSize + 2);
+            _finishCellPen = new Pen(Brushes.Blue, stepSize + 2);
+
         }
 
         private void LoadMaze(string path)
@@ -27,8 +41,25 @@ namespace MazeTest
             if (path == null)
                 return;
 
-            //var mazeFile = $@"{Environment.CurrentDirectory}/maze.png";
             _mazeImg = new Bitmap(Bitmap.FromFile(path));
+            _overImg = (Bitmap)_mazeImg.Clone();
+            _gfx = Graphics.FromImage(_overImg);
+
+            _gfx.DrawImage(_mazeImg, new Point());
+
+            pictureBox1.Image = _overImg;
+
+            ProcessMazeCells();
+
+            SolveButton.Enabled = true;
+        }
+
+        private void LoadMaze(Image image)
+        {
+            if (image == null)
+                return;
+
+            _mazeImg = new Bitmap(image);
             _overImg = (Bitmap)_mazeImg.Clone();
             _gfx = Graphics.FromImage(_overImg);
 
@@ -60,6 +91,7 @@ namespace MazeTest
             var columns = _mazeImg.Width / stepSize;
             var rows = _mazeImg.Height / stepSize;
 
+
             for (int x = xOffset; x < _mazeImg.Width - xOffset - halfStep; x += stepSize)
             {
                 idxY = 0;
@@ -81,19 +113,20 @@ namespace MazeTest
                     var pBottom = _mazeImg.GetPixel(centerX, centerY + halfStep).ToArgb();
                     var pRight = _mazeImg.GetPixel(centerX + halfStep, centerY).ToArgb();
 
+
                     // Set sides where pixels are not pure black.
-                    int sides = 0;
+                    int sides = 15;
                     if (pTop > _blackPixelVal)
-                        sides += (int)Side.Top;
+                        sides -= (int)Side.Top;
 
                     if (pLeft > _blackPixelVal)
-                        sides += (int)Side.Left;
+                        sides -= (int)Side.Left;
 
                     if (pBottom > _blackPixelVal)
-                        sides += (int)Side.Bottom;
+                        sides -= (int)Side.Bottom;
 
                     if (pRight > _blackPixelVal)
-                        sides += (int)Side.Right;
+                        sides -= (int)Side.Right;
 
                     cells.Add(new Cell(centerX, centerY, idxX, idxY, stepSize, (Side)sides));
 
@@ -103,20 +136,14 @@ namespace MazeTest
                 idxX++;
             }
 
-            _cellCollection = new CellCollection(cells, columns, rows);
+            _cellCollection = new CellCollection(cells, columns, rows, stepSize);
             _cellCollection.FindStartAndFinish();
 
+            DrawCells(_cellCollection.Cells, _cellCollection.StartCell, _cellCollection.FinishCell);
+
+
+
             pictureBox1.Refresh();
-        }
-
-        private void InitPens(int stepSize)
-        {
-            _pathPen = new Pen(Brushes.Blue, stepSize / 2);
-            _pathPenComp = new Pen(Brushes.Red, stepSize);
-
-            _startCellPen = new Pen(Brushes.GreenYellow, stepSize + 2);
-            _finishCellPen = new Pen(Brushes.Blue, stepSize + 2);
-
         }
 
         private int FindStepSize()
@@ -144,6 +171,214 @@ namespace MazeTest
 
             return steps;
         }
+
+        private List<Cell> FindPath(CellCollection cells, int drawDelay = 1)
+        {
+            cells.ClearStates();
+
+            Cell start = cells.StartCell;
+            Cell finish = cells.FinishCell;
+
+            int delay = drawDelay;
+            var path = new List<Cell>() { start };
+            //int deadEnds = 0;
+            //int steps = 0;
+            var openSides = start.GetOpenSides();
+            start.WasVisited = true;
+
+            Cell next = cells.NextCell(start, openSides);
+            path.Add(next);
+
+            bool done = false;
+            while (done == false)
+            {
+                //steps++;
+                next = cells.NextCell(next, next.GetOpenSides());
+
+                if (next != null)
+                {
+                    path.Add(next);
+                    next.WasVisited = true;
+                }
+                else
+                {
+                    //deadEnds++;
+                    while (next == null)
+                    {
+                        //steps++;
+                        path.RemoveAt(path.Count - 1);
+                        next = path[path.Count - 1];
+
+                        //next = path.Last();
+                        next = cells.NextCell(next, next.GetOpenSides());
+
+                        //if (delay > 0)
+                        //{
+                        //DrawPath(path, _pathPen, true);
+                        //    Task.Delay(delay).Wait();
+                        //}
+                    }
+
+                    path.Add(next);
+                    next.WasVisited = true;
+                }
+
+
+                if (next.IdxX == finish.IdxX && next.IdxY == finish.IdxY)
+                    done = true;
+
+
+                if (delay > 0)
+                {
+                    DrawPath(path, _pathPen, true, false);
+                    //Task.Delay(delay).Wait();
+                }
+
+            }
+
+            //Debug.WriteLine($"DeadEnds: {deadEnds}  Steps: {steps}");
+            return path;
+        }
+
+      
+        private void GenerateNewMaze(int columns, int rows, int wallThickness, int cellSize)
+        {
+            var cells = new List<Cell>(columns * rows);
+            int sides = 15;
+            int halfStep = cellSize / 2;
+
+            for (int col = 0; col < columns; col++)
+            {
+                for (int row = 0; row < rows; row++)
+                {
+                    var centerX = col * cellSize + halfStep;
+                    var centerY = row * cellSize + halfStep;
+
+                    var newCell = new Cell(centerX, centerY, col, row, cellSize, (Side)sides);
+                    newCell.Index = newCell.GetIndex(columns, col, row);
+                    cells.Add(newCell);
+                }
+            }
+
+            _mazeGenStack = new Stack<Cell>();
+            _mazeGenCells = cells;
+
+            var bottomCells = cells.Where(cell => cell.IdxY == rows - 1).ToArray();
+            var startCell = bottomCells[_random.Next(bottomCells.Length)];
+            startCell.State = CellState.Visited;
+            using (var newMazeImg = new Bitmap(rows * cellSize + (wallThickness / 2), columns * cellSize + (wallThickness / 2), System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+            using (var gfx = Graphics.FromImage(newMazeImg))
+            {
+                var timer = new System.Diagnostics.Stopwatch();
+                timer.Restart();
+
+                GenerateNewMaze(startCell, columns, rows);
+
+                timer.Stop();
+                System.Diagnostics.Debug.WriteLine(string.Format("Gen Time: {0} ms  {1} ticks", timer.Elapsed.TotalMilliseconds, timer.Elapsed.Ticks));
+
+
+                startCell.RemoveSide(Side.Bottom);
+
+                var openTopCells = _mazeGenCells.Where(c => c.IdxY == 0).ToArray();
+                openTopCells[_random.Next(openTopCells.Length)].RemoveSide(Side.Top);
+
+
+                DrawMaze(_mazeGenCells.ToArray(), gfx, wallThickness);
+
+                newMazeImg.Save($@"C:\Temp\maze.png");
+                LoadMaze(newMazeImg);
+            }
+        }
+
+
+        private void GenerateNewMaze(Cell startCell, int columns, int rows)
+        {
+            int doneCount = 0;
+            int targetCount = _mazeGenCells.Where(c => c.State == CellState.Default).Count();
+
+            Cell currentCell = startCell;
+            while (doneCount < targetCount)
+            {
+                int cellIndex = currentCell.Index;
+
+                int northIdx = currentCell.IdxX * columns + (currentCell.IdxY - 1);
+                int eastIdx = (currentCell.IdxX + 1) * columns + currentCell.IdxY;
+                int southIdx = currentCell.IdxX * columns + (currentCell.IdxY + 1);
+                int westIdx = (currentCell.IdxX - 1) * columns + currentCell.IdxY;
+
+                bool northEdge = currentCell.IdxY == 0;
+                bool eastEdge = currentCell.IdxX == columns - 1;
+                bool southEdge = currentCell.IdxY == rows - 1;
+                bool westEdge = currentCell.IdxX == 0;
+
+                //DrawCells(_mazeGenStack.ToArray());
+                //DrawCells(_mazeGenCells.ToArray());
+
+                //pictureBox1.Refresh();
+                //Application.DoEvents();
+
+                var unvisitedNeighbors = new List<Cell>();
+
+                if (!northEdge && (northIdx >= 0 && northIdx < _mazeGenCells.Count) && _mazeGenCells[northIdx].State == CellState.Default)
+                    unvisitedNeighbors.Add(_mazeGenCells[northIdx]);
+
+                if (!eastEdge && (eastIdx >= 0 && eastIdx < _mazeGenCells.Count) && _mazeGenCells[eastIdx].State == CellState.Default)
+                    unvisitedNeighbors.Add(_mazeGenCells[eastIdx]);
+
+                if (!southEdge && (southIdx >= 0 && southIdx < _mazeGenCells.Count) && _mazeGenCells[southIdx].State == CellState.Default)
+                    unvisitedNeighbors.Add(_mazeGenCells[southIdx]);
+
+                if (!westEdge && (westIdx >= 0 && westIdx < _mazeGenCells.Count) && _mazeGenCells[westIdx].State == CellState.Default)
+                    unvisitedNeighbors.Add(_mazeGenCells[westIdx]);
+
+                if (unvisitedNeighbors.Count > 0)
+                {
+                    var selectedNeighbour = unvisitedNeighbors[_random.Next(unvisitedNeighbors.Count)];
+
+                    int selectedNeightbourIndex = selectedNeighbour.Index;
+
+                    if (selectedNeightbourIndex == northIdx)
+                    {
+                        currentCell.RemoveSide(Side.Top);
+                        selectedNeighbour.RemoveSide(Side.Bottom);
+                    }
+                    else if (selectedNeightbourIndex == eastIdx)
+                    {
+                        currentCell.RemoveSide(Side.Right);
+                        selectedNeighbour.RemoveSide(Side.Left);
+                    }
+                    else if (selectedNeightbourIndex == southIdx)
+                    {
+                        currentCell.RemoveSide(Side.Bottom);
+                        selectedNeighbour.RemoveSide(Side.Top);
+                    }
+                    else if (selectedNeightbourIndex == westIdx)
+                    {
+                        currentCell.RemoveSide(Side.Left);
+                        selectedNeighbour.RemoveSide(Side.Right);
+                    }
+
+                    _mazeGenStack.Push(currentCell);
+
+                    selectedNeighbour.State = CellState.Visited;
+
+                    currentCell = selectedNeighbour;
+
+                    doneCount++;
+                }
+                else
+                {
+                    currentCell.State = CellState.Empty;
+
+                    var previousCell = _mazeGenStack.Pop();
+                    previousCell.State = CellState.Empty;
+
+                    currentCell = previousCell;
+                }
+            }
+        }
+
 
         private void StressTest(int count)
         {
@@ -173,11 +408,14 @@ namespace MazeTest
             _gfx.DrawImage(_mazeImg, new Point());
             pictureBox1.Refresh();
 
+            _cellCollection.ClearStates();
+            //_cellCollection.FindStartAndFinish();
+
             var timer = new System.Diagnostics.Stopwatch();
             timer.Restart();
 
             _steps = 0;
-            var path = FindPath(_cellCollection, 10);
+            var path = FindPath(_cellCollection, 0);
 
             timer.Stop();
             System.Diagnostics.Debug.WriteLine(string.Format("Solution Time: {0} ms  {1} ticks", timer.Elapsed.TotalMilliseconds, timer.Elapsed.Ticks));
@@ -242,86 +480,105 @@ namespace MazeTest
             }
         }
 
+        private void DrawMaze(Cell[] cells, Graphics gfx, int wallThickness)
+        {
+            gfx.Clear(Color.White);
+
+            using (var wallPen = new Pen(Color.Black, wallThickness / 2))
+            {
+                foreach (var cell in cells)
+                {
+                    foreach (var side in cell.GetSides())
+                    {
+                        var start = new Point();
+                        var end = new Point();
+                        int sideLen = cell.SideLen / 2;
+                        switch (side)
+                        {
+                            case Side.Top:
+                                start = new Point(cell.X - sideLen, cell.Y - sideLen);
+                                end = new Point(cell.X + sideLen, cell.Y - sideLen);
+                                break;
+
+                            case Side.Left:
+                                start = new Point(cell.X - sideLen, cell.Y - sideLen);
+                                end = new Point(cell.X - sideLen, cell.Y + sideLen);
+                                break;
+                            case Side.Bottom:
+                                start = new Point(cell.X - sideLen, cell.Y + sideLen);
+                                end = new Point(cell.X + sideLen, cell.Y + sideLen);
+                                break;
+                            case Side.Right:
+                                start = new Point(cell.X + sideLen, cell.Y - sideLen);
+                                end = new Point(cell.X + sideLen, cell.Y + sideLen);
+                                break;
+                        }
+
+                        gfx.DrawLine(wallPen, start, end);
+                    }
+                }
+            }
+        }
+
+        private void DrawCells(Cell[] cells, Cell startCell, Cell finishcell)
+        {
+            _steps++;
+
+            _gfx.Clear(Color.White);
+
+            foreach (var cell in cells)
+            {
+                foreach (var side in cell.GetSides())
+                {
+                    var start = new Point();
+                    var end = new Point();
+                    int sideLen = cell.SideLen / 2;
+                    switch (side)
+                    {
+                        case Side.Top:
+                            start = new Point(cell.X - sideLen, cell.Y - sideLen);
+                            end = new Point(cell.X + sideLen, cell.Y - sideLen);
+                            break;
+
+                        case Side.Left:
+                            start = new Point(cell.X - sideLen, cell.Y - sideLen);
+                            end = new Point(cell.X - sideLen, cell.Y + sideLen);
+                            break;
+                        case Side.Bottom:
+                            start = new Point(cell.X - sideLen, cell.Y + sideLen);
+                            end = new Point(cell.X + sideLen, cell.Y + sideLen);
+                            break;
+                        case Side.Right:
+                            start = new Point(cell.X + sideLen, cell.Y - sideLen);
+                            end = new Point(cell.X + sideLen, cell.Y + sideLen);
+                            break;
+                    }
+
+                    _gfx.DrawLine(Pens.Black, start, end);
+                }
+            }
+
+
+            _gfx.DrawRectangle(new Pen(Color.LimeGreen, 4), startCell.GetRectangle());
+            _gfx.DrawRectangle(new Pen(Color.Red, 4), finishcell.GetRectangle());
+
+            pictureBox1.Refresh();
+            Application.DoEvents();
+        }
+
         private void DrawVisitedCells(Cell[] cells)
         {
-            using (var brush = new SolidBrush(Color.FromArgb(150, Color.RosyBrown)))
+            //using (var brush = new SolidBrush(Color.FromArgb(150, Color.RosyBrown)))
+            using (var brush = new SolidBrush(Color.FromArgb(150, Color.Blue)))
             {
 
                 foreach (var cell in cells)
                 {
-                    if (cell.HasPath)
+                    if (cell.WasVisited)
                         _gfx.FillPolygon(brush, cell.GetPoly());
                 }
             }
 
-        }
-
-        private List<Cell> FindPath(CellCollection cells, int drawDelay = 1)
-        {
-            cells.ClearStates();
-
-            Cell start = cells.StartCell;
-            Cell finish = cells.FinishCell;
-
-            int delay = drawDelay;
-            var path = new List<Cell>() { start };
-            //int deadEnds = 0;
-            //int steps = 0;
-            var openSides = start.GetOpenSides();
-            start.HasPath = true;
-
-            Cell next = cells.NextCell(start, openSides);
-            path.Add(next);
-
-            bool done = false;
-            while (done == false)
-            {
-                //steps++;
-                next = cells.NextCell(next, next.GetOpenSides());
-
-                if (next != null)
-                {
-                    path.Add(next);
-                    next.HasPath = true;
-                }
-                else
-                {
-                    //deadEnds++;
-                    while (next == null)
-                    {
-                        //steps++;
-                        path.RemoveAt(path.Count - 1);
-                        next = path[path.Count - 1];
-
-                        //next = path.Last();
-                        next = cells.NextCell(next, next.GetOpenSides());
-
-                        //if (delay > 0)
-                        //{
-                        //DrawPath(path, _pathPen, true);
-                        //    Task.Delay(delay).Wait();
-                        //}
-                    }
-
-                    path.Add(next);
-                    next.HasPath = true;
-                }
-
-
-                if (next.IdxX == finish.IdxX && next.IdxY == finish.IdxY)
-                    done = true;
-
-
-                if (delay > 0)
-                {
-                    DrawPath(path, _pathPen, true, false);
-                    //Task.Delay(delay).Wait();
-                }
-
-            }
-
-            //Debug.WriteLine($"DeadEnds: {deadEnds}  Steps: {steps}");
-            return path;
         }
 
         private bool PointIsInsidePolygon(PointF[] polygon, PointF testPoint)
@@ -533,6 +790,20 @@ namespace MazeTest
         private void button1_Click(object sender, EventArgs e)
         {
             StressTest(2000);
+        }
+
+        private void GenMazeButton_Click(object sender, EventArgs e)
+        {
+            //GenerateNewMaze(_cellCollection.Columns, _cellCollection.Rows, 2, _cellCollection.StepSize);
+
+            string[] parseDims = GenColumnsRowsTextBox.Text.Trim().Split(',');
+            if (int.TryParse(parseDims[0], out int columns) && int.TryParse(parseDims[1], out int rows))
+            {
+                GenerateNewMaze(columns, rows, 2, 4);
+            }
+
+            //GenerateNewMaze(400, 400, 2, 4);
+
         }
     }
 

@@ -15,8 +15,10 @@ namespace MazeTest
         public int Y;
         public Side Sides;
         public int SideLen;
-        public bool HasPath = false;
+        public bool WasVisited = false;
         public bool WasDrawn = false;
+        public CellState State = CellState.Default;
+        public int Index;
 
         //public Cell(int x, int y, List<Side> openSides)
         //{
@@ -48,11 +50,74 @@ namespace MazeTest
             for (int i = 1; i <= 8; i <<= 1)
             {
                 Side side = (Side)i;
-                if ((Sides & side) == side)
+                if ((Sides & side) == 0)
                     sides.Add(side);
             }
 
             return sides.ToArray();
+        }
+
+        public Side[] GetSides()
+        {
+            var sides = new List<Side>();
+            for (int i = 1; i <= 8; i <<= 1)
+            {
+                Side side = (Side)i;
+                if (((int)Sides & (int)side) == i)
+                    sides.Add(side);
+            }
+
+            return sides.ToArray();
+        }
+
+        public Side SharedSide(Cell cell)
+        {
+            if (cell.IdxX == IdxX && cell.IdxY == IdxY - 1) // Top
+                return Side.Top;
+            else if (cell.IdxX == IdxX + 1 && cell.IdxY == IdxY) // Right
+                return Side.Right;
+            else if (cell.IdxX == IdxX && cell.IdxY == IdxY + 1) // Bottom
+                return Side.Bottom;
+            else if (cell.IdxX == IdxX - 1 && cell.IdxY == IdxY) // Left
+                return Side.Left;
+
+            throw new Exception("Does not share a side.");
+
+        }
+
+        //public Side[] GetOpenSides()
+        //{
+        //    var sides = new List<Side>();
+        //    for (int i = 1; i <= 8; i <<= 1)
+        //    {
+        //        Side side = (Side)i;
+        //        if ((Sides & side) == side)
+        //            sides.Add(side);
+        //    }
+
+        //    return sides.ToArray();
+        //}
+
+        public int GetIndex(int columns, int idxX, int idxY)
+        {
+            return idxX * columns + idxY;
+        }
+
+        public void RemoveSide(Side side)
+        {
+            if (HasSide(side))
+                Sides -= (int)side;
+        }
+
+        public void AddSide(Side side)
+        {
+            if (!HasSide(side))
+                Sides += (int)side;
+        }
+
+        public bool HasSide(Side side)
+        {
+            return (Sides & side) != 0;
         }
 
         //public PointF[] GetPoly()
@@ -114,7 +179,17 @@ namespace MazeTest
                     sides += $" {side.ToString()} |";
             }
 
-            return $"({X},{Y}) ({IdxX},{IdxY}) [{sides}]";
+            return $"[{Index}] ({IdxX},{IdxY}) [{sides}]";
+
+
+            //return $"({X},{Y}) ({IdxX},{IdxY}) [{sides}]";
         }
+    }
+
+    public enum CellState
+    {
+        Default,
+        Empty,
+        Visited
     }
 }
